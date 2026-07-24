@@ -589,6 +589,11 @@ namespace Sims3ModernPatcher
                 "  del /F /Q \"%DOCS%\\scriptCache.package\" 2>nul\r\n" +
                 "  del /F /Q \"%DOCS%\\simCompositorCache.package\" 2>nul\r\n" +
                 "  del /F /Q \"%DOCS%\\socialCache.package\" 2>nul\r\n" +
+                "  if exist \"%DOCS%\\CurrentGame.sims3\\\" (\r\n" +
+                "    rd /S /Q \"%DOCS%\\CurrentGame.sims3\" 2>nul\r\n" +
+                "    mkdir \"%DOCS%\\CurrentGame.sims3\" 2>nul\r\n" +
+                "    echo [OK] Emptied CurrentGame.sims3.\r\n" +
+                "  )\r\n" +
                 "  echo [OK] Caches purged.\r\n" +
                 ") else (\r\n" +
                 "  echo [!] Sims 3 Documents folder not found yet. Caches skipped.\r\n" +

@@ -289,6 +289,9 @@ public sealed class CoreBehaviorTests
         Assert.Contains("if exist \"TS3.exe\"", script);
         Assert.Contains("Starting TS3.exe", script);
         Assert.Contains("already running. It was left untouched", script);
+        Assert.Contains("CASPartCache.package", script);
+        Assert.Contains("CurrentGame.sims3", script);
+        Assert.Contains("rd /S /Q \"%DOCS%\\CurrentGame.sims3\"", script);
         Assert.DoesNotContain("taskkill", script, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("/affinity", script, StringComparison.OrdinalIgnoreCase);
     }
