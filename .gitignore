@@ -7,3 +7,7 @@ Output/
 TestResults/
 Sims3ModernPatcher.Tests/bin/
 Sims3ModernPatcher.Tests/obj/
+
+# Local diagnostic drops from the gaming PC (not source)
+Sims 3 Logs/
+Other Sims 3 Artifacts/

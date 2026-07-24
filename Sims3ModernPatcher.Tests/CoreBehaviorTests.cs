@@ -185,16 +185,106 @@ public sealed class CoreBehaviorTests
     }
 
     [Fact]
-    public void PatchCatalog_DefaultsToNativeDirectXForReliability()
+    public void GameLocator_RecognizesElectronicArtsFolderAsEaApp()
+    {
+        GamePlatform platform = GameLocator.InferPlatform(@"D:\Electronic Arts\The Sims 3");
+        Assert.Equal(GamePlatform.EaApp, platform);
+    }
+
+    [Fact]
+    public void GameLocator_ParsesModernAndLegacySteamLibraryFolders()
+    {
+        const string modern =
+            """
+            "libraryfolders"
+            {
+            	"0"
+            	{
+            		"path"		"C:\\Program Files (x86)\\Steam"
+            	}
+            	"1"
+            	{
+            		"path"		"D:\\SteamLibrary"
+            	}
+            }
+            """;
+
+        const string legacy =
+            """
+            "LibraryFolders"
+            {
+            	"1"		"E:\\Games\\Steam"
+            	"2"		"F:\\SteamLibrary"
+            }
+            """;
+
+        string[] modernLibs = GameLocator.ParseSteamLibraryFoldersVdf(modern).ToArray();
+        string[] legacyLibs = GameLocator.ParseSteamLibraryFoldersVdf(legacy).ToArray();
+
+        Assert.Contains(@"C:\Program Files (x86)\Steam", modernLibs);
+        Assert.Contains(@"D:\SteamLibrary", modernLibs);
+        Assert.Contains(@"E:\Games\Steam", legacyLibs);
+        Assert.Contains(@"F:\SteamLibrary", legacyLibs);
+    }
+
+    [Theory]
+    [InlineData("The Sims 3", true)]
+    [InlineData("The Sims™ 3", true)]
+    [InlineData("The Sims 3 World Adventures", false)]
+    [InlineData("The Sims 3 Pets", false)]
+    [InlineData("Steam App 47890", false)]
+    public void GameLocator_IdentifiesBaseGameDisplayNames(string displayName, bool expected)
+    {
+        Assert.Equal(expected, GameLocator.IsBaseSims3DisplayName(displayName));
+    }
+
+    [Fact]
+    public void GameLocator_StandardCandidatesIncludeSteamAndEaDefaults()
+    {
+        var candidates = GameLocator.EnumerateStandardInstallCandidates().ToArray();
+
+        Assert.Contains(
+            candidates,
+            c => c.platform == GamePlatform.Steam
+                 && c.path.Contains(@"steamapps\common\The Sims 3", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(
+            candidates,
+            c => c.platform == GamePlatform.EaApp
+                 && c.path.Contains(@"EA Games\The Sims 3", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(
+            candidates,
+            c => c.platform == GamePlatform.EaApp
+                 && c.path.Contains(@"Electronic Arts\The Sims 3", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void PatchCatalog_DoesNotPutDxvkInConflictCards()
     {
         var conflicts = PatchCatalog.BuildConflicts(
             new[] { new GameInstall { Path = @"C:\Games\The Sims 3", Platform = GamePlatform.EaApp } },
-            new HardwareInfo { GpuVendor = "AMD" });
+            new HardwareInfo { GpuVendor = "AMD", GpuName = "Radeon" });
 
-        ConflictChoice graphics = Assert.Single(conflicts);
-        Assert.Equal(PatchCatalog.ChoiceGraphicsApi, graphics.Id);
-        Assert.Equal(PatchCatalog.OptDxNative, graphics.SelectedOptionId);
-        Assert.True(graphics.Options.Single(o => o.Id == PatchCatalog.OptDxNative).IsRecommended);
+        Assert.Empty(conflicts);
+    }
+
+    [Fact]
+    public void PatchCatalog_PrefersDxvkForAllNvidia()
+    {
+        Assert.True(PatchCatalog.PrefersDxvk(new HardwareInfo
+        {
+            GpuVendor = "NVIDIA",
+            GpuName = "NVIDIA GeForce RTX 5050"
+        }));
+        Assert.True(PatchCatalog.PrefersDxvk(new HardwareInfo
+        {
+            GpuVendor = "NVIDIA",
+            GpuName = "NVIDIA GeForce GTX 1060"
+        }));
+        Assert.False(PatchCatalog.PrefersDxvk(new HardwareInfo
+        {
+            GpuVendor = "AMD",
+            GpuName = "Radeon RX 7800 XT"
+        }));
     }
 
     [Theory]

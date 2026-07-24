@@ -440,7 +440,8 @@ namespace Sims3ModernPatcher
 
             SafeArchiveExtractor.ExtractTarGzEntry(archivePath, "/x32/d3d9.dll", target);
             File.WriteAllText(marker, FileIntegrity.ComputeSha256(target));
-            log("[SUCCESS] Installed DXVK d3d9.dll for improved AMD/Intel compatibility.");
+            log("[SUCCESS] Installed DXVK 2.6.1 (32-bit d3d9.dll) into Game\\Bin.");
+            log("[INFO] Marker written: .Sims3ModernPatcher.dxvk (so a later native run can reverse this).");
         }
 
         private static void RestoreNativeDirectX(string binFolder, string backupFolder, Action<string> log)

@@ -80,6 +80,9 @@ namespace Sims3ModernPatcher
             RefreshInstallLabel();
             TxtStatus.Text = string.Empty;
             Log($"[+] Using manually selected install ({manual.PlatformLabel}): {manual.Path}");
+            Log(ChkInstallDxvk.IsChecked == true
+                ? "[*] DXVK install is checked (will download/install on GO)."
+                : "[*] DXVK install is unchecked.");
         }
 
         private async void BtnGo_Click(object sender, RoutedEventArgs e)
@@ -98,6 +101,10 @@ namespace Sims3ModernPatcher
             }
 
             var choices = CollectChoices();
+            choices[PatchCatalog.ChoiceGraphicsApi] = ChkInstallDxvk.IsChecked == true
+                ? PatchCatalog.OptDxvk
+                : PatchCatalog.OptDxNative;
+
             GameInstall install;
             try
             {
@@ -119,6 +126,9 @@ namespace Sims3ModernPatcher
             TxtLogOutput.Clear();
             StartFreshSessionLog("patch-run");
             Log("[*] Starting modern compatibility patching...");
+            Log(ChkInstallDxvk.IsChecked == true
+                ? "[*] Graphics path: DXVK (download + install d3d9.dll)."
+                : "[*] Graphics path: native DirectX 9.");
 
             try
             {
@@ -190,11 +200,16 @@ namespace Sims3ModernPatcher
                 _installs = _engine.FindInstallations();
                 RebuildConflicts();
                 RefreshInstallLabel();
+                RefreshDxvkDefault();
 
                 Log("[*] Environment scan complete.");
                 Log($"[+] CPU: {_hardware.CpuDisplay}");
                 Log($"[+] GPU: {_hardware.GpuDisplay}");
                 Log($"[+] OS: {_hardware.OsName}");
+                Log("[*] Checked Steam libraries, Sims/EA/Origin registry keys, and standard EA App + Steam folders on fixed drives.");
+                Log(ChkInstallDxvk.IsChecked == true
+                    ? "[*] DXVK install is checked (will download/install 32-bit d3d9.dll on GO)."
+                    : "[*] DXVK install is unchecked (will keep / restore native DirectX 9).");
 
                 if (_installs.Count == 0)
                 {
@@ -346,7 +361,17 @@ namespace Sims3ModernPatcher
             BtnOpenSaveBackups.IsEnabled = enabled;
             BtnOpenLogs.IsEnabled = enabled;
             ChkCreateShortcut.IsEnabled = enabled;
+            ChkInstallDxvk.IsEnabled = enabled;
             ConflictPanel.IsEnabled = enabled;
+        }
+
+        private void RefreshDxvkDefault()
+        {
+            bool prefer = PatchCatalog.PrefersDxvk(_hardware);
+            ChkInstallDxvk.IsChecked = prefer;
+            ChkInstallDxvk.Content = prefer
+                ? "Install DXVK ★ recommended for this GPU (downloads 32-bit d3d9.dll)"
+                : "Install DXVK (downloads 32-bit d3d9.dll — optional on this GPU)";
         }
 
         private void EnsureSessionLog(string reason)
