@@ -20,12 +20,14 @@ public sealed class UiTests
                 var go = Assert.IsType<Button>(window.FindName("BtnGo"));
                 var browse = Assert.IsType<Button>(window.FindName("BtnBrowse"));
                 var backups = Assert.IsType<Button>(window.FindName("BtnOpenSaveBackups"));
+                var logs = Assert.IsType<Button>(window.FindName("BtnOpenLogs"));
                 var shortcut = Assert.IsType<CheckBox>(window.FindName("ChkCreateShortcut"));
                 var log = Assert.IsType<TextBox>(window.FindName("TxtLogOutput"));
 
                 Assert.Equal("GO", go.Content);
                 Assert.Contains("Browse", browse.Content?.ToString());
                 Assert.Equal("Open Save Backups", backups.Content);
+                Assert.Equal("Open Logs", logs.Content);
                 Assert.True(shortcut.IsChecked);
                 Assert.True(log.IsReadOnly);
             }

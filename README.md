@@ -48,6 +48,8 @@ but must remain explicitly limited to known Sims 3/EA names.
 - **Protects saves first**: creates a timestamped ZIP under
   `%LOCALAPPDATA%\Sims3ModernPatcher\SaveBackups` before patching and keeps the newest ten.
   Backups are never restored automatically.
+- **Writes a patcher log**: every progress line is also saved under
+  `%LOCALAPPDATA%\Sims3ModernPatcher\Logs\patcher-*.log` (Open Logs button in the UI).
 - **Verifies downloads**: pinned third-party releases are SHA-256 checked before extraction.
 - **Avoids partial installs**: all downloads finish before game files change, and a per-run
   rollback snapshot restores touched files if a later local step fails.
