@@ -2,6 +2,23 @@
 
 Native **C# .NET 8 WPF** app for Windows 11. Publishes to a single self-contained `Sims3ModernPatcher.exe` with no extra runtime install.
 
+## Alpha software and disclaimer
+
+> [!WARNING]
+> This application is alpha software. It is in active development, largely untested, and may
+> contain defects that damage a Sims 3 installation, mods, settings, or saved games. Use it
+> entirely at your own risk and keep independent backups of anything important.
+
+This software is provided **as is**, without guarantees or warranties of any kind, express or
+implied. There is no guarantee that it will work with any particular computer, Sims 3 release,
+storefront, mod configuration, or future third-party download. The authors and contributors
+accept no responsibility for data loss, corruption, service interruption, or other damage
+resulting from its use.
+
+The application was designed and tested by **Gary Lucero**, but was largely written with
+**Cursor and Grok 4.5**. AI-generated code can contain subtle or unexpected errors and should
+not be treated as a substitute for independent review and testing.
+
 ## Intended mutation scope
 
 This is intentionally an invasive repair/installation tool. With Administrator approval it may:
