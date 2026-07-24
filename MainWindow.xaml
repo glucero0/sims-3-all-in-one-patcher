@@ -1,0 +1,152 @@
+<Window x:Class="Sims3ModernPatcher.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Sims 3 Modernizer"
+        Height="720" Width="920"
+        MinHeight="600" MinWidth="780"
+        WindowStartupLocation="CenterScreen"
+        Background="#0B1220" Foreground="#F8FAFC">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,16">
+            <TextBlock Text="Sims 3 Modernizer" FontSize="26" FontWeight="Bold" Foreground="#7DD3FC"/>
+            <TextBlock Text="Finds your install, detects your PC, and applies the modern Windows 11 compatibility fixes."
+                       FontSize="13" Foreground="#94A3B8" Margin="0,4,0,0" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <!-- Detected environment -->
+        <Border Grid.Row="1" Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="10" Padding="16" Margin="0,0,0,14">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="DETECTED ON THIS PC" FontSize="11" FontWeight="Bold" Foreground="#64748B" Margin="0,0,0,10"/>
+                <Button Grid.Row="0" Grid.Column="1" x:Name="BtnRescan" Content="Re-scan" Width="90" Height="28"
+                        Background="#1D4ED8" Foreground="White" BorderThickness="0" Click="BtnRescan_Click"/>
+
+                <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,0,0,8">
+                    <TextBlock Text="Game install" FontSize="11" Foreground="#94A3B8"/>
+                    <TextBlock x:Name="TxtInstallInfo" Text="Scanning..." FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                </StackPanel>
+
+                <UniformGrid Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Columns="3" Margin="0,4,0,0">
+                    <StackPanel Margin="0,0,12,0">
+                        <TextBlock Text="Processor" FontSize="11" Foreground="#94A3B8"/>
+                        <TextBlock x:Name="TxtCpuInfo" Text="Detecting..." FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <StackPanel Margin="0,0,12,0">
+                        <TextBlock Text="Graphics" FontSize="11" Foreground="#94A3B8"/>
+                        <TextBlock x:Name="TxtGpuInfo" Text="Detecting..." FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <StackPanel>
+                        <TextBlock Text="Windows" FontSize="11" Foreground="#94A3B8"/>
+                        <TextBlock x:Name="TxtOsInfo" Text="Detecting..." FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </UniformGrid>
+
+                <StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,12,0,0">
+                    <Button x:Name="BtnBrowse" Content="Browse for Sims 3 folder..." Height="30" Padding="12,0"
+                            Background="#334155" Foreground="White" BorderThickness="0" Click="BtnBrowse_Click"/>
+                    <TextBlock x:Name="TxtStatus" VerticalAlignment="Center" Margin="14,0,0,0" Foreground="#FBBF24" FontSize="12"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Conflicts + log -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1.2*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="10" Padding="16" Margin="0,0,8,0">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top" Margin="0,0,0,10">
+                        <TextBlock Text="CHOICES (only when needed)" FontSize="11" FontWeight="Bold" Foreground="#64748B"/>
+                        <TextBlock Text="If two fixes disagree, pick the option that sounds right for you. Plain-language notes are included."
+                                   FontSize="12" Foreground="#94A3B8" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                    </StackPanel>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel x:Name="ConflictPanel"/>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+
+            <Border Grid.Column="1" Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="10" Padding="16" Margin="8,0,0,0">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="PROGRESS" FontSize="11" FontWeight="Bold" Foreground="#64748B" Margin="0,0,0,10"/>
+                    <TextBox x:Name="TxtLogOutput"
+                             Background="#020617"
+                             Foreground="#34D399"
+                             FontFamily="Consolas"
+                             FontSize="11"
+                             IsReadOnly="True"
+                             TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto"
+                             BorderThickness="0"
+                             Padding="10"/>
+                </DockPanel>
+            </Border>
+        </Grid>
+
+        <!-- Footer -->
+        <Border Grid.Row="3" Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="10" Padding="16" Margin="0,14,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <CheckBox Grid.Column="0"
+                          x:Name="ChkCreateShortcut"
+                          Content="Create desktop shortcut for easy launching"
+                          IsChecked="True"
+                          Foreground="#CBD5E1"
+                          VerticalAlignment="Center"/>
+                <Button Grid.Column="1"
+                        x:Name="BtnOpenSaveBackups"
+                        Content="Open Save Backups"
+                        Height="36"
+                        Padding="14,0"
+                        Margin="12,0"
+                        Background="#334155"
+                        Foreground="White"
+                        BorderThickness="0"
+                        Click="BtnOpenSaveBackups_Click"/>
+                <Button Grid.Column="2"
+                        x:Name="BtnGo"
+                        Content="GO"
+                        Width="160" Height="44"
+                        Background="#2563EB"
+                        Foreground="White"
+                        FontWeight="Bold"
+                        FontSize="18"
+                        BorderThickness="0"
+                        Click="BtnGo_Click"/>
+            </Grid>
+        </Border>
+
+        <TextBlock Grid.Row="4"
+                   Margin="4,10,4,0"
+                   FontSize="11"
+                   Foreground="#64748B"
+                   TextWrapping="Wrap"
+                   Text="After GO finishes, use the new desktop shortcut (or Steam / EA App). A restart is recommended so Windows fully releases any locked game files."/>
+    </Grid>
+</Window>

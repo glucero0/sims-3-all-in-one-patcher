@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>Sims3ModernPatcher</AssemblyName>
+    <RootNamespace>Sims3ModernPatcher</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Management" Version="10.0.10" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="Sims3ModernPatcher.Tests\**\*.cs" />
+    <EmbeddedResource Remove="Sims3ModernPatcher.Tests\**\*" />
+    <None Remove="Sims3ModernPatcher.Tests\**\*" />
+    <Page Remove="Sims3ModernPatcher.Tests\**\*.xaml" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,9 @@
+bin/
+obj/
+Output/
+.vs/
+*.user
+*.suo
+TestResults/
+Sims3ModernPatcher.Tests/bin/
+Sims3ModernPatcher.Tests/obj/
