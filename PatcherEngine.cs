@@ -187,7 +187,7 @@ namespace Sims3ModernPatcher
             if (includeDesktopShortcut)
             {
                 string desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-                rollback.Capture(Path.Combine(desktop, "The Sims 3 (Reliable Win11).lnk"));
+                rollback.Capture(Path.Combine(desktop, "TS3-Windows 11.lnk"));
             }
         }
 
@@ -626,10 +626,10 @@ namespace Sims3ModernPatcher
             try
             {
                 string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-                string shortcutLocation = Path.Combine(desktopPath, "The Sims 3 (Reliable Win11).lnk");
+                string shortcutLocation = Path.Combine(desktopPath, "TS3-Windows 11.lnk");
                 temporaryShortcut = Path.Combine(
                     desktopPath,
-                    $"The Sims 3 (Reliable Win11).{Guid.NewGuid():N}.tmp.lnk");
+                    $"TS3-Windows 11.{Guid.NewGuid():N}.tmp.lnk");
 
                 Type? shellType = Type.GetTypeFromProgID("WScript.Shell");
                 if (shellType is null)
@@ -643,7 +643,7 @@ namespace Sims3ModernPatcher
                 shortcut.Description = "Launch The Sims 3 with cache purge and modern Win11-friendly fixes";
                 shortcut.Save();
                 File.Move(temporaryShortcut, shortcutLocation, overwrite: true);
-                log("[SUCCESS] Created desktop shortcut: The Sims 3 (Reliable Win11).");
+                log("[SUCCESS] Created desktop shortcut: TS3-Windows 11.");
                 return true;
             }
             catch (Exception ex)

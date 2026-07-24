@@ -140,7 +140,7 @@ namespace Sims3ModernPatcher
                     this,
                     "All selected Sims 3 modern patches were applied successfully.\n\n" +
                     (patchResult.DesktopShortcutCreated
-                        ? "A desktop shortcut named “The Sims 3 (Reliable Win11)” was created.\n\n"
+                        ? "A desktop shortcut named “TS3-Windows 11” was created.\n\n"
                         : ChkCreateShortcut.IsChecked == true
                             ? "The patches succeeded, but Windows could not create the desktop shortcut. See the progress log.\n\n"
                         : string.Empty) +
