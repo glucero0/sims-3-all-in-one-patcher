@@ -42,43 +42,17 @@ namespace Sims3ModernPatcher
                 });
             }
 
-            // DXVK replaces d3d9.dll and conflicts with staying on native DirectX 9.
-            // Only ask when the benefit is uncertain (AMD/Intel). NVIDIA defaults to native.
-            if (hardware.GpuVendor is "AMD" or "Intel" or "Unknown")
-            {
-                conflicts.Add(new ConflictChoice
-                {
-                    Id = ChoiceGraphicsApi,
-                    Title = "Which graphics path should the game use?",
-                    Explanation =
-                        "The Sims 3 talks to your graphics card through old DirectX 9. " +
-                        "DXVK is an alternate translator that can help some AMD/Intel systems, but it adds another compatibility layer. For maximum reliability, try built-in DirectX first.",
-                    Options = new List<ConflictOption>
-                    {
-                        new()
-                        {
-                            Id = OptDxNative,
-                            Label = "Keep built-in DirectX (recommended)",
-                            Description =
-                                "Uses the game’s original graphics path and the fewest extra components. " +
-                                "Choose this for the safest day-to-day setup.",
-                            IsRecommended = true
-                        },
-                        new()
-                        {
-                            Id = OptDxvk,
-                            Label = "Install DXVK",
-                            Description =
-                                "Can fix graphics-related crashes or stuttering on some AMD/Intel systems. " +
-                                "Try it only if built-in DirectX is unstable; you can re-run this tool to remove it.",
-                            IsRecommended = false
-                        }
-                    },
-                    SelectedOptionId = OptDxNative
-                });
-            }
-
+            // DXVK is offered via the always-visible checkbox in the main window, not as a conflict card.
+            _ = hardware;
             return conflicts;
+        }
+
+        /// <summary>
+        /// NVIDIA's modern DX9 path is a common source of Serious Errors when loading worlds/saves.
+        /// </summary>
+        public static bool PrefersDxvk(HardwareInfo hardware)
+        {
+            return string.Equals(hardware.GpuVendor, "NVIDIA", StringComparison.OrdinalIgnoreCase);
         }
 
         public static GameInstall ResolveInstall(

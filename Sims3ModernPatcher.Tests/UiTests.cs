@@ -22,6 +22,7 @@ public sealed class UiTests
                 var backups = Assert.IsType<Button>(window.FindName("BtnOpenSaveBackups"));
                 var logs = Assert.IsType<Button>(window.FindName("BtnOpenLogs"));
                 var shortcut = Assert.IsType<CheckBox>(window.FindName("ChkCreateShortcut"));
+                var dxvk = Assert.IsType<CheckBox>(window.FindName("ChkInstallDxvk"));
                 var log = Assert.IsType<TextBox>(window.FindName("TxtLogOutput"));
 
                 Assert.Equal("GO", go.Content);
@@ -29,6 +30,8 @@ public sealed class UiTests
                 Assert.Equal("Open Save Backups", backups.Content);
                 Assert.Equal("Open Logs", logs.Content);
                 Assert.True(shortcut.IsChecked);
+                Assert.NotNull(dxvk.Content);
+                Assert.Contains("DXVK", dxvk.Content?.ToString());
                 Assert.True(log.IsReadOnly);
             }
             finally
