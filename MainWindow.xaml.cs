@@ -15,40 +15,37 @@ namespace Sims3ModernPatcher
         private HardwareInfo _hardware = new();
         private List<GameInstall> _installs = new();
         private List<ConflictChoice> _conflicts = new();
+        private PatcherSessionLog? _sessionLog;
         private bool _busy;
 
         public MainWindow()
         {
             InitializeComponent();
-            Loaded += (_, _) => Rescan();
+            Loaded += (_, _) =>
+            {
+                EnsureSessionLog("startup");
+                Rescan();
+            };
+            Closed += (_, _) =>
+            {
+                _sessionLog?.Dispose();
+                _sessionLog = null;
+            };
         }
 
         private void BtnRescan_Click(object sender, RoutedEventArgs e) => Rescan();
 
         private void BtnOpenSaveBackups_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                string backupRoot = SaveBackupManager.GetBackupRoot();
-                System.IO.Directory.CreateDirectory(backupRoot);
-                var startInfo = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = "explorer.exe",
-                    UseShellExecute = true
-                };
-                startInfo.ArgumentList.Add(backupRoot);
-                System.Diagnostics.Process.Start(startInfo);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(
-                    this,
-                    "Windows could not open the save-backup folder.\n\n" + ex.Message,
-                    "Could not open backups",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-            }
-        }
+            => OpenFolderInExplorer(
+                SaveBackupManager.GetBackupRoot(),
+                "Could not open backups",
+                "Windows could not open the save-backup folder.");
+
+        private void BtnOpenLogs_Click(object sender, RoutedEventArgs e)
+            => OpenFolderInExplorer(
+                PatcherSessionLog.GetLogRoot(),
+                "Could not open logs",
+                "Windows could not open the patcher log folder.");
 
         private void BtnBrowse_Click(object sender, RoutedEventArgs e)
         {
@@ -120,6 +117,7 @@ namespace Sims3ModernPatcher
             _busy = true;
             SetUiEnabled(false);
             TxtLogOutput.Clear();
+            StartFreshSessionLog("patch-run");
             Log("[*] Starting modern compatibility patching...");
 
             try
@@ -135,18 +133,23 @@ namespace Sims3ModernPatcher
                 PatchResult patchResult = await Task.Run(() => _engine.ApplyAsync(plan, Log));
 
                 Log("[SUCCESS] Done.");
+                if (_sessionLog is not null)
+                    Log($"[+] Full run log saved to: {_sessionLog.FilePath}");
 
                 var result = MessageBox.Show(
                     this,
                     "All selected Sims 3 modern patches were applied successfully.\n\n" +
                     (patchResult.DesktopShortcutCreated
-                        ? "A desktop shortcut named “The Sims 3 (Reliable Win11)” was created.\n\n"
+                        ? "A desktop shortcut named “TS3-Windows 11” was created.\n\n"
                         : ChkCreateShortcut.IsChecked == true
                             ? "The patches succeeded, but Windows could not create the desktop shortcut. See the progress log.\n\n"
                         : string.Empty) +
                     (patchResult.SaveBackupPath is not null
                         ? "Your existing saves were backed up and left unchanged.\n" +
                           patchResult.SaveBackupPath + "\n\n"
+                        : string.Empty) +
+                    (_sessionLog is not null
+                        ? "Patcher log:\n" + _sessionLog.FilePath + "\n\n"
                         : string.Empty) +
                     "Please restart your PC so Windows fully releases any locked game files.\n\n" +
                     "Restart now?",
@@ -341,8 +344,56 @@ namespace Sims3ModernPatcher
             BtnRescan.IsEnabled = enabled;
             BtnBrowse.IsEnabled = enabled;
             BtnOpenSaveBackups.IsEnabled = enabled;
+            BtnOpenLogs.IsEnabled = enabled;
             ChkCreateShortcut.IsEnabled = enabled;
             ConflictPanel.IsEnabled = enabled;
+        }
+
+        private void EnsureSessionLog(string reason)
+        {
+            if (_sessionLog is not null)
+                return;
+
+            StartFreshSessionLog(reason);
+        }
+
+        private void StartFreshSessionLog(string reason)
+        {
+            try
+            {
+                _sessionLog?.Dispose();
+                _sessionLog = PatcherSessionLog.StartNew(reason);
+            }
+            catch (Exception ex)
+            {
+                _sessionLog = null;
+                TxtLogOutput.AppendText(
+                    "[!] Could not create on-disk patcher log: " + ex.Message + Environment.NewLine);
+            }
+        }
+
+        private void OpenFolderInExplorer(string folderPath, string title, string preface)
+        {
+            try
+            {
+                System.IO.Directory.CreateDirectory(folderPath);
+                var startInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "explorer.exe",
+                    UseShellExecute = true
+                };
+                startInfo.ArgumentList.Add(folderPath);
+                System.Diagnostics.Process.Start(startInfo);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    this,
+                    preface + "\n\n" + ex.Message,
+                    title,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
         }
 
         private void Log(string message)
@@ -353,6 +404,7 @@ namespace Sims3ModernPatcher
                 return;
             }
 
+            _sessionLog?.WriteLine(message);
             TxtLogOutput.AppendText(message + Environment.NewLine);
             TxtLogOutput.ScrollToEnd();
         }

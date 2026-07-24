@@ -289,6 +289,9 @@ public sealed class CoreBehaviorTests
         Assert.Contains("if exist \"TS3.exe\"", script);
         Assert.Contains("Starting TS3.exe", script);
         Assert.Contains("already running. It was left untouched", script);
+        Assert.Contains("CASPartCache.package", script);
+        Assert.Contains("CurrentGame.sims3", script);
+        Assert.Contains("rd /S /Q \"%DOCS%\\CurrentGame.sims3\"", script);
         Assert.DoesNotContain("taskkill", script, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("/affinity", script, StringComparison.OrdinalIgnoreCase);
     }
@@ -395,6 +398,31 @@ public sealed class CoreBehaviorTests
             Path.Combine("Sims3ModernPatcher", "SaveBackups"),
             root,
             StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void PatcherSessionLog_WritesTimestampedFileUnderLocalApplicationData()
+    {
+        string root = PatcherSessionLog.GetLogRoot();
+        string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+
+        Assert.StartsWith(localAppData, root, StringComparison.OrdinalIgnoreCase);
+        Assert.EndsWith(
+            Path.Combine("Sims3ModernPatcher", "Logs"),
+            root,
+            StringComparison.OrdinalIgnoreCase);
+
+        string filePath;
+        using (PatcherSessionLog session = PatcherSessionLog.StartNew("unit-test"))
+        {
+            session.WriteLine("[+] unit test line");
+            filePath = session.FilePath;
+            Assert.True(File.Exists(filePath));
+        }
+
+        string contents = File.ReadAllText(filePath);
+        Assert.Contains("unit-test", contents, StringComparison.Ordinal);
+        Assert.Contains("unit test line", contents, StringComparison.Ordinal);
     }
 
     private static void WriteZipEntry(ZipArchive archive, string name, string contents)
