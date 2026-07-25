@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace Sims3ModernPatcher
@@ -94,6 +95,7 @@ namespace Sims3ModernPatcher
                 ApplyLaaPatch(Path.Combine(binFolder, exeName), backupFolder, exeName, log);
 
             PatchGraphicsConfiguration(binFolder, backupFolder, plan.Hardware, log);
+            VerifyTextureMemoryFallback(binFolder, log);
             string packagesDir = EnsureModsFolder(log);
 
             await InstallAsiLoaderAsync(binFolder, backupFolder, cacheDir, log);
@@ -103,6 +105,8 @@ namespace Sims3ModernPatcher
                 await InstallDxvkAsync(binFolder, backupFolder, cacheDir, log);
             else
                 RestoreNativeDirectX(binFolder, backupFolder, log);
+
+            VerifyGraphicsApiState(binFolder, useDxvk, log);
 
             await NRaasInstaller.InstallStabilityModsAsync(plan.Install, packagesDir, nraasCache, log);
 
@@ -118,6 +122,10 @@ namespace Sims3ModernPatcher
 
             bool shortcutCreated = plan.CreateDesktopShortcut
                 && CreateDesktopShortcut(launcherBatPath, binFolder, primaryExePath, log);
+
+            // Re-check after all writes — EA/tools sometimes race, and we must not commit a bad state.
+            VerifyTextureMemoryFallback(binFolder, log);
+            VerifyGraphicsApiState(binFolder, useDxvk, log);
 
             rollback.Commit();
             log("[SUCCESS] All modern compatibility patches have been applied.");
@@ -143,6 +151,7 @@ namespace Sims3ModernPatcher
                 "GraphicsRules.sgr",
                 "GraphicsRules.sfp",
                 "GraphicsCards.sgr",
+                "dinput8.dll",
                 "wininet.dll",
                 "Sims3SettingsSetter.asi",
                 "d3d9.dll",
@@ -329,10 +338,15 @@ namespace Sims3ModernPatcher
                 hardware.GpuDeviceId,
                 hardware.GpuName,
                 out bool cardAdded);
-            if (cardAdded)
+            // Always normalize DXVK's GTX 580 spoof id (0x1080); harmless without DXVK.
+            cardsUpdated = GraphicsCardsEditor.EnsureDxvkSpoofCard(cardsUpdated, out bool spoofFixed);
+            if (cardAdded || spoofFixed)
             {
                 File.WriteAllText(cardsFile, cardsUpdated);
-                log($"[SUCCESS] Added detected GPU {hardware.GpuName} (0x{hardware.GpuDeviceId}) to GraphicsCards.sgr.");
+                if (cardAdded)
+                    log($"[SUCCESS] Added detected GPU {hardware.GpuName} (0x{hardware.GpuDeviceId}) to GraphicsCards.sgr.");
+                if (spoofFixed)
+                    log("[SUCCESS] Ensured DXVK spoof GPU 0x1080 (GeForce GTX 580) is listed in GraphicsCards.sgr.");
             }
             else if (string.IsNullOrEmpty(hardware.GpuDeviceId))
             {
@@ -340,8 +354,77 @@ namespace Sims3ModernPatcher
             }
             else
             {
-                log("[INFO] Detected GPU is already listed, or its vendor section was not found in GraphicsCards.sgr.");
+                log($"[INFO] GPU PCI 0x{hardware.GpuDeviceId} is already present in GraphicsCards.sgr.");
             }
+        }
+
+        private static void VerifyTextureMemoryFallback(string binFolder, Action<string> log)
+        {
+            string[] candidates = { "GraphicsRules.sgr", "GraphicsRules.sfp" };
+            string? rulesFile = candidates
+                .Select(name => Path.Combine(binFolder, name))
+                .FirstOrDefault(File.Exists);
+
+            if (rulesFile is null)
+            {
+                throw new InvalidOperationException(
+                    "GraphicsRules file is missing; cannot verify the 1024 MB texture-memory fallback.");
+            }
+
+            string text = File.ReadAllText(rulesFile);
+            if (GraphicsRulesEditor.IsTextureMemoryFallbackApplied(text))
+            {
+                log($"[SUCCESS] Verified {Path.GetFileName(rulesFile)} texture-memory fallback is 1024 MB.");
+                return;
+            }
+
+            // One more forced rewrite in case a concurrent tool reverted mid-run.
+            string updated = GraphicsRulesEditor.ApplyTextureMemoryFallback(text, out _);
+            File.WriteAllText(rulesFile, updated);
+            text = File.ReadAllText(rulesFile);
+            if (!GraphicsRulesEditor.IsTextureMemoryFallbackApplied(text))
+            {
+                throw new InvalidOperationException(
+                    "Failed to apply the 1024 MB texture-memory fallback in GraphicsRules. " +
+                    "Without this, Sims 3 often cannot load or create worlds on modern GPUs.");
+            }
+
+            log($"[SUCCESS] Re-applied and verified {Path.GetFileName(rulesFile)} texture-memory fallback is 1024 MB.");
+        }
+
+        private static void VerifyGraphicsApiState(string binFolder, bool expectDxvk, Action<string> log)
+        {
+            string d3d9 = Path.Combine(binFolder, "d3d9.dll");
+            string marker = Path.Combine(binFolder, ".Sims3ModernPatcher.dxvk");
+
+            if (expectDxvk)
+            {
+                if (!File.Exists(d3d9) || !DxvkDetector.LooksLikeDxvk(d3d9))
+                {
+                    throw new InvalidOperationException(
+                        "DXVK was requested but Game\\Bin\\d3d9.dll is missing or is not DXVK.");
+                }
+
+                if (!IsManagedDxvk(d3d9, marker))
+                {
+                    throw new InvalidOperationException(
+                        "DXVK is present but not managed by this patcher (missing/invalid marker).");
+                }
+
+                log("[SUCCESS] Verified managed DXVK 2.6.1 is installed in Game\\Bin.");
+                return;
+            }
+
+            if (File.Exists(d3d9) && DxvkDetector.LooksLikeDxvk(d3d9))
+            {
+                throw new InvalidOperationException(
+                    "Native DirectX was requested, but an unmanaged or leftover DXVK d3d9.dll is still in Game\\Bin.");
+            }
+
+            if (File.Exists(marker))
+                File.Delete(marker);
+
+            log("[SUCCESS] Verified Game\\Bin is not using DXVK (native DirectX 9 path).");
         }
 
         private static string EnsureModsFolder(Action<string> log)
@@ -379,18 +462,35 @@ namespace Sims3ModernPatcher
         private static async Task InstallAsiLoaderAsync(
             string binFolder, string backupFolder, string cacheDir, Action<string> log)
         {
-            // Sims 3 is 32-bit. wininet.dll is the S3SS-recommended loader name and leaves d3d9.dll free for DXVK.
-            string targetDll = Path.Combine(binFolder, "wininet.dll");
+            // Sims 3 is 32-bit. Prefer dinput8.dll so DXVK can own d3d9.dll and EA App is less
+            // likely to fight a wininet.dll proxy (seen as WININET.dll_unloaded crashes on Win11/EA).
+            string targetDll = Path.Combine(binFolder, "dinput8.dll");
             string zipPath = Path.Combine(cacheDir, "wininet-Win32.zip");
 
-            log("[*] Downloading Ultimate ASI Loader (32-bit wininet.dll)...");
+            log("[*] Downloading Ultimate ASI Loader (32-bit)...");
             await DownloadFileAsync(AsiLoaderUrl, zipPath, AsiLoaderSha256, log);
 
             if (File.Exists(targetDll))
-                BackupFile(targetDll, Path.Combine(backupFolder, "wininet.dll.bak"));
+                BackupFile(targetDll, Path.Combine(backupFolder, "dinput8.dll.bak"));
 
+            // Release zip entry is named wininet.dll; rename on extract target path.
             SafeArchiveExtractor.ExtractZipEntry(zipPath, "wininet.dll", targetDll);
-            log("[SUCCESS] Installed ASI Loader as Game\\Bin\\wininet.dll.");
+            log("[SUCCESS] Installed ASI Loader as Game\\Bin\\dinput8.dll.");
+
+            // Remove a previously installed wininet proxy so it cannot keep crashing launches.
+            string legacyWininet = Path.Combine(binFolder, "wininet.dll");
+            if (File.Exists(legacyWininet))
+            {
+                string quarantine = Path.Combine(
+                    backupFolder,
+                    "DisabledConflicts",
+                    "wininet.dll.legacy-asi");
+                Directory.CreateDirectory(Path.GetDirectoryName(quarantine)!);
+                if (File.Exists(quarantine))
+                    File.Delete(quarantine);
+                File.Move(legacyWininet, quarantine);
+                log("[+] Moved legacy Game\\Bin\\wininet.dll ASI proxy aside (was crashing TS3 on this PC).");
+            }
         }
 
         private static async Task InstallSims3SettingsSetterAsync(
@@ -430,46 +530,119 @@ namespace Sims3ModernPatcher
             string target = Path.Combine(binFolder, "d3d9.dll");
             string marker = Path.Combine(binFolder, ".Sims3ModernPatcher.dxvk");
             string backup = Path.Combine(backupFolder, "d3d9.dll.bak");
+            if (File.Exists(target) && DxvkDetector.LooksLikeDxvk(target) && !IsManagedDxvk(target, marker))
+                log("[!] Replacing unmanaged DXVK in Game\\Bin with patcher-managed DXVK 2.6.1.");
+
             if (!IsManagedDxvk(target, marker))
             {
-                if (File.Exists(target))
+                // Only preserve a non-DXVK d3d9 as the native restore backup.
+                if (File.Exists(target) && !DxvkDetector.LooksLikeDxvk(target))
                     File.Copy(target, backup, overwrite: true);
-                else if (File.Exists(backup))
+                else if (File.Exists(backup) && DxvkDetector.LooksLikeDxvk(backup))
                     File.Delete(backup);
             }
 
             SafeArchiveExtractor.ExtractTarGzEntry(archivePath, "/x32/d3d9.dll", target);
             File.WriteAllText(marker, FileIntegrity.ComputeSha256(target));
+            WriteDxvkConfig(binFolder, log);
+            SyncOptionsIniForDxvk(log);
+
+            string staleLog = Path.Combine(binFolder, "TS3_d3d9.log");
+            if (File.Exists(staleLog))
+            {
+                try { File.Delete(staleLog); }
+                catch { /* best-effort */ }
+            }
+
             log("[SUCCESS] Installed DXVK 2.6.1 (32-bit d3d9.dll) into Game\\Bin.");
             log("[INFO] Marker written: .Sims3ModernPatcher.dxvk (so a later native run can reverse this).");
+        }
+
+        private static void WriteDxvkConfig(string binFolder, Action<string> log)
+        {
+            string path = Path.Combine(binFolder, "dxvk.conf");
+            const string contents =
+                "# Generated by Sims3ModernPatcher\n" +
+                "d3d9.customVendorId = 10de\n" +
+                "d3d9.customDeviceId = 1080\n" +
+                "d3d9.customDeviceDesc = GeForce GTX 580\n" +
+                "d3d9.deviceLocalMemorySize = 1073741824\n" +
+                "d3d9.availableMemory = 1024\n";
+            File.WriteAllText(path, contents);
+            log("[+] Wrote Game\\Bin\\dxvk.conf (GTX 580 spoof + 1024 MB reported memory).");
+        }
+
+        private static void SyncOptionsIniForDxvk(Action<string> log)
+        {
+            string docs = FindSims3DocumentsFolder();
+            string optionsPath = Path.Combine(docs, "Options.ini");
+            if (!File.Exists(optionsPath))
+                return;
+
+            string original = File.ReadAllText(optionsPath);
+            string updated = Regex.Replace(
+                original,
+                @"(?im)^(lastdevice\s*=\s*).*$",
+                "${1}0;10de;1080;65535");
+            if (string.Equals(original, updated, StringComparison.Ordinal)
+                && !Regex.IsMatch(original, @"(?im)^lastdevice\s*="))
+            {
+                string nl = original.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
+                updated = original.TrimEnd() + nl + "lastdevice = 0;10de;1080;65535" + nl;
+            }
+
+            updated = Regex.Replace(
+                updated,
+                @"(?im)^(showncardnotrecognizedwarning\s*=\s*).*$",
+                "${1}0");
+
+            if (!string.Equals(original, updated, StringComparison.Ordinal))
+            {
+                File.WriteAllText(optionsPath, updated);
+                log("[+] Updated Options.ini lastdevice to DXVK spoof 10de:1080.");
+            }
         }
 
         private static void RestoreNativeDirectX(string binFolder, string backupFolder, Action<string> log)
         {
             string target = Path.Combine(binFolder, "d3d9.dll");
             string marker = Path.Combine(binFolder, ".Sims3ModernPatcher.dxvk");
-            if (!File.Exists(marker))
+            string backup = Path.Combine(backupFolder, "d3d9.dll.bak");
+            bool hasMarker = File.Exists(marker);
+            bool managed = IsManagedDxvk(target, marker);
+            bool looksLikeDxvk = DxvkDetector.LooksLikeDxvk(target);
+
+            if (!looksLikeDxvk && !hasMarker)
             {
                 log("[INFO] Keeping native DirectX 9 renderer.");
                 return;
             }
 
-            if (!IsManagedDxvk(target, marker))
+            if (looksLikeDxvk && !managed)
             {
-                File.Delete(marker);
-                log("[INFO] d3d9.dll was changed outside this patcher; it was left untouched.");
-                return;
+                log("[!] Found unmanaged DXVK d3d9.dll (installed outside this patcher). Removing it for native DirectX.");
             }
 
-            if (File.Exists(target))
+            if (File.Exists(target) && (managed || looksLikeDxvk))
                 File.Delete(target);
 
-            string backup = Path.Combine(backupFolder, "d3d9.dll.bak");
             if (File.Exists(backup))
-                File.Copy(backup, target, overwrite: true);
+            {
+                if (DxvkDetector.LooksLikeDxvk(backup))
+                {
+                    File.Delete(backup);
+                    log("[INFO] Discarded d3d9.dll.bak because it was also DXVK.");
+                }
+                else if (!File.Exists(target))
+                {
+                    File.Copy(backup, target, overwrite: true);
+                }
+            }
 
-            File.Delete(marker);
-            log("[SUCCESS] Removed patcher-managed DXVK and restored the previous DirectX file, if any.");
+            if (File.Exists(marker))
+                File.Delete(marker);
+
+            log("[SUCCESS] Removed DXVK; game will use system DirectX 9.");
         }
 
         private static bool IsManagedDxvk(string target, string marker)
