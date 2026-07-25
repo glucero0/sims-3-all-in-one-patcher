@@ -19,6 +19,23 @@ The application was designed and tested by **Gary Lucero**, but was largely writ
 **Cursor and Grok 4.5**. AI-generated code can contain subtle or unexpected errors and should
 not be treated as a substitute for independent review and testing.
 
+## Tested configuration (early results)
+
+> [!NOTE]
+> Despite the warning above, limited real-world testing on one contemporary desktop has been
+> encouraging. On that system The Sims 3 launched and played successfully in both a fresh
+> new-world save and an existing, larger legacy save after patching.
+>
+> That test machine was a 64-bit **Windows 11 Home** desktop with:
+>
+> - **CPU**: Intel Core Ultra 5 (Arrow Lake generation, LGA1851)
+> - **GPU**: NVIDIA GeForce RTX 5050 (8 GB GDDR6)
+> - **RAM**: 16 GB DDR5
+> - **Storage**: 1 TB PCIe NVMe Gen4 SSD
+>
+> This is a single data point, not a guarantee for other hardware, storefronts, mod sets, or
+> save files. Your mileage may vary.
+
 ## Intended mutation scope
 
 This is intentionally an invasive repair/installation tool. With Administrator approval it may:
