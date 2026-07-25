@@ -79,6 +79,26 @@ public sealed class CoreBehaviorTests
     }
 
     [Fact]
+    public void GraphicsRulesEditor_ReportsWhenFallbackIsApplied()
+    {
+        const string stock =
+            "if ($textureMemory == 0)\n" +
+            "  seti textureMemory       32\n" +
+            "  setb textureMemorySizeOK false\n" +
+            "endif\n";
+        string patched = GraphicsRulesEditor.ApplyTextureMemoryFallback(stock, out _);
+
+        Assert.False(GraphicsRulesEditor.IsTextureMemoryFallbackApplied(stock));
+        Assert.True(GraphicsRulesEditor.IsTextureMemoryFallbackApplied(patched));
+    }
+
+    [Fact]
+    public void DxvkDetector_ReturnsFalseForMissingFile()
+    {
+        Assert.False(DxvkDetector.LooksLikeDxvk(@"C:\definitely\missing\d3d9.dll"));
+    }
+
+    [Fact]
     public void GraphicsCardsEditor_AddsExactDetectedPciDeviceIdOnce()
     {
         const string input =
@@ -103,6 +123,21 @@ public sealed class CoreBehaviorTests
         Assert.False(secondChanged);
         Assert.Contains("card 0x2704 \"NVIDIA GeForce RTX 4080\"", first);
         Assert.Equal(first, second);
+    }
+
+    [Fact]
+    public void GraphicsCardsEditor_NormalizesBareDxvkSpoofId()
+    {
+        const string input =
+            "vendor \"NVIDIA\" 0x10b4 0x12d2 0x10de\n" +
+            "\tcard 1080 \"Geforce GTX 580\"\n" +
+            "end\n";
+
+        string output = GraphicsCardsEditor.EnsureDxvkSpoofCard(input, out bool changed);
+
+        Assert.True(changed);
+        Assert.Contains("card 0x1080 \"Geforce GTX 580\"", output);
+        Assert.DoesNotContain("card 1080 \"", output);
     }
 
     [Fact]
