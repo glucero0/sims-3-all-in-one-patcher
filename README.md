@@ -38,6 +38,83 @@ not be treated as a substitute for independent review and testing.
 > This is a single data point, not a guarantee for other hardware, storefronts, mod sets, or
 > save files. Your mileage may vary.
 
+## If the patcher (or the game after patching) does not work
+
+Please [open a GitHub issue](https://github.com/glucero0/sims-3-all-in-one-patcher/issues/new)
+and include as much of the checklist below as you can. Exact logs and error text matter more
+than technical detail — you do not need to explain *why* something failed.
+
+### 1. Say what went wrong (in plain language)
+
+- Did **the patcher itself** fail (red error popup, Patch button did not finish)?
+- Or did Patch say **success**, but **The Sims 3** still crashes, freezes, shows a Serious Error,
+  black screens, or will not load a world / save?
+- What were you trying to do when it failed (first run of the patcher, re-run, launching the
+  game, loading a save, creating a new game, etc.)?
+- Copy the **exact text** from any error popup, or paste a screenshot of it.
+
+### 2. Attach the patcher log (most important)
+
+Every run writes a log under:
+
+`%LOCALAPPDATA%\Sims3ModernPatcher\Logs\`
+
+(full path example:
+`C:\Users\<YourName>\AppData\Local\Sims3ModernPatcher\Logs\`)
+
+**Easiest way:** in the patcher, click **Open Logs**, then attach the newest
+`patcher-….log` file to the GitHub issue.
+
+That log already records your detected CPU / GPU / Windows edition, Sims 3 folder and
+storefront (Steam / EA App / other), game version when found, whether DXVK was selected, and
+each step until the failure. Attaching it is usually enough for a useful diagnosis.
+
+### 3. Fill in a short environment snapshot
+
+You can copy most of this from the top of the patcher window (or from the log):
+
+| What | Example / where to find it |
+| --- | --- |
+| Windows edition | Shown as **Windows** in the patcher (e.g. Windows 11 Home 24H2, 64-bit) |
+| CPU | Shown as **Processor** |
+| GPU | Shown as **Graphics** (mention a laptop / dual-GPU setup if you have one) |
+| Storefront | Steam, EA App, disc / other — and the install path shown in the patcher |
+| DXVK checkbox | Was **Install DXVK** checked or unchecked when you clicked Patch? |
+| Ran as Administrator? | Yes / No (right-click → Run as administrator) |
+| Other mods? | Any mods **not** installed by this patcher? (list names if you know them) |
+| Which EXE | Approximate download date, or the release / build you used |
+
+### 4. Extra files — only if the *game* misbehaves after a successful Patch
+
+Attach these if they exist (skip any that are missing):
+
+- Sims 3 Documents folder (usually
+  `Documents\Electronic Arts\The Sims 3\`, or under OneDrive Documents):
+  - `Exception.log`
+  - `LastException.txt`
+  - `DeviceConfig.log`
+  - `Options.ini`
+- Inside the game install `Game\Bin\` folder:
+  - `skuversion.txt` (game patch version)
+  - `TS3_d3d9.log` (only if present — DXVK write-up of graphics startup)
+- Optional: a screenshot of the in-game error, or of the patcher’s Detected panel if CPU/GPU/install look wrong.
+
+Do **not** upload full save files or large save-backup ZIPs unless a maintainer asks for them.
+Save backups live at `%LOCALAPPDATA%\Sims3ModernPatcher\SaveBackups\` (**Open Save Backups**
+in the UI) and are for your recovery, not for routine bug reports.
+
+### 5. How to report it
+
+1. Gather the items above (at minimum: short description + newest patcher log + popup text).
+2. Open a new issue:
+   [https://github.com/glucero0/sims-3-all-in-one-patcher/issues/new](https://github.com/glucero0/sims-3-all-in-one-patcher/issues/new)
+3. Use a clear title (e.g. “Patch fails downloading DXVK on Windows 11” or
+   “Serious Error after successful Patch — NVIDIA RTX 4070”).
+4. Paste the checklist answers in the body and attach the log / extra files.
+
+That package is what maintainers (and automated helpers) need to reproduce the failure path,
+tell download vs install vs post-launch graphics/mod problems apart, and ship a fix.
+
 ## Intended mutation scope
 
 This is intentionally an invasive repair/installation tool. With Administrator approval it may:
