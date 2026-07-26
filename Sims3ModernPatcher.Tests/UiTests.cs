@@ -25,7 +25,7 @@ public sealed class UiTests
                 var dxvk = Assert.IsType<CheckBox>(window.FindName("ChkInstallDxvk"));
                 var log = Assert.IsType<TextBox>(window.FindName("TxtLogOutput"));
 
-                Assert.Equal("GO", go.Content);
+                Assert.Equal("Patch", go.Content);
                 Assert.Contains("Browse", browse.Content?.ToString());
                 Assert.Equal("Open Save Backups", backups.Content);
                 Assert.Equal("Open Logs", logs.Content);
