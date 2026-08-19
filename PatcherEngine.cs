@@ -462,16 +462,15 @@ namespace Sims3ModernPatcher
             // Sims 3 is 32-bit. Prefer dinput8.dll so DXVK can own d3d9.dll and EA App is less
             // likely to fight a wininet.dll proxy (seen as WININET.dll_unloaded crashes on Win11/EA).
             string targetDll = Path.Combine(binFolder, "dinput8.dll");
-            string zipPath = Path.Combine(cacheDir, "wininet-Win32.zip");
+            string zipPath = AsiLoaderCache.GetCanonicalZipPath(cacheDir);
 
             log("[*] Downloading Ultimate ASI Loader (32-bit)...");
-            await DownloadFileAsync(AsiLoaderUrl, zipPath, AsiLoaderSha256, log);
+            await EnsureAsiLoaderDownloadedAsync(cacheDir, log);
 
             if (File.Exists(targetDll))
                 BackupFile(targetDll, Path.Combine(backupFolder, "dinput8.dll.bak"));
 
-            // Release zip entry is named wininet.dll; rename on extract target path.
-            SafeArchiveExtractor.ExtractZipEntry(zipPath, "wininet.dll", targetDll);
+            SafeArchiveExtractor.ExtractZipEntry(zipPath, AsiLoaderEntryNames, targetDll);
             log("[SUCCESS] Installed ASI Loader as Game\\Bin\\dinput8.dll.");
 
             // Remove a previously installed wininet proxy so it cannot keep crashing launches.
