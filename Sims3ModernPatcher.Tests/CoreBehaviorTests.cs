@@ -419,6 +419,170 @@ public sealed class CoreBehaviorTests
     }
 
     [Fact]
+    public void ZipExtractor_PrefersFirstCandidateName()
+    {
+        using var temp = new TemporaryDirectory();
+        string archivePath = Path.Combine(temp.Path, "loader.zip");
+        using (ZipArchive archive = ZipFile.Open(archivePath, ZipArchiveMode.Create))
+        {
+            WriteZipEntry(archive, "dinput8.dll", "fallback");
+            WriteZipEntry(archive, "wininet.dll", "preferred");
+        }
+
+        string destination = Path.Combine(temp.Path, "out", "wininet.dll");
+        SafeArchiveExtractor.ExtractZipEntry(
+            archivePath,
+            new[] { "wininet.dll", "dinput8.dll" },
+            destination);
+
+        Assert.Equal("preferred", File.ReadAllText(destination));
+    }
+
+    [Fact]
+    public void ZipExtractor_FallsBackToAlternateLoaderName()
+    {
+        using var temp = new TemporaryDirectory();
+        string archivePath = Path.Combine(temp.Path, "loader.zip");
+        using (ZipArchive archive = ZipFile.Open(archivePath, ZipArchiveMode.Create))
+        {
+            WriteZipEntry(archive, "dinput8.dll", "combined");
+        }
+
+        string destination = Path.Combine(temp.Path, "out", "wininet.dll");
+        SafeArchiveExtractor.ExtractZipEntry(
+            archivePath,
+            new[] { "wininet.dll", "dinput8.dll" },
+            destination);
+
+        Assert.Equal("combined", File.ReadAllText(destination));
+    }
+
+    [Fact]
+    public void GitHubReleaseAssets_FindsNamedAssetAndSha256Digest()
+    {
+        const string json =
+            """
+            {
+              "tag_name": "Win32-latest",
+              "assets": [
+                {
+                  "name": "dinput8-Win32.zip",
+                  "url": "https://api.github.com/repos/ThirteenAG/Ultimate-ASI-Loader/releases/assets/1",
+                  "browser_download_url": "https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/dinput8-Win32.zip",
+                  "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                },
+                {
+                  "name": "wininet-Win32.zip",
+                  "url": "https://api.github.com/repos/ThirteenAG/Ultimate-ASI-Loader/releases/assets/516768648",
+                  "browser_download_url": "https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/wininet-Win32.zip",
+                  "digest": "sha256:2C4B26C316755A67CE14661131ED196398CCA242F7F6363105947A934B09112C"
+                }
+              ]
+            }
+            """;
+
+        GitHubReleaseAsset? asset = GitHubReleaseAssets.FindByName(json, "wininet-Win32.zip");
+
+        Assert.NotNull(asset);
+        Assert.Equal("wininet-Win32.zip", asset!.Name);
+        Assert.Equal(
+            "https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/wininet-Win32.zip",
+            asset.BrowserDownloadUrl);
+        Assert.Equal(
+            "https://api.github.com/repos/ThirteenAG/Ultimate-ASI-Loader/releases/assets/516768648",
+            asset.ApiDownloadUrl);
+        Assert.Equal("2c4b26c316755a67ce14661131ed196398cca242f7f6363105947a934b09112c", asset.Sha256);
+    }
+
+    [Fact]
+    public void GitHubReleaseAssets_ReturnsNullWhenAssetIsMissing()
+    {
+        const string json = """{ "assets": [ { "name": "dinput8-Win32.zip" } ] }""";
+
+        Assert.Null(GitHubReleaseAssets.FindByName(json, "wininet-Win32.zip"));
+    }
+
+    [Theory]
+    [InlineData("sha256:2c4b26c316755a67ce14661131ed196398cca242f7f6363105947a934b09112c", "2c4b26c316755a67ce14661131ed196398cca242f7f6363105947a934b09112c")]
+    [InlineData("SHA256:2C4B26C316755A67CE14661131ED196398CCA242F7F6363105947A934B09112C", "2c4b26c316755a67ce14661131ed196398cca242f7f6363105947a934b09112c")]
+    [InlineData("md5:not-a-sha", null)]
+    [InlineData("", null)]
+    [InlineData(null, null)]
+    public void GitHubReleaseAssets_ParsesSha256Digest(string? digest, string? expected)
+    {
+        Assert.Equal(expected, GitHubReleaseAssets.ParseSha256Digest(digest));
+    }
+
+    [Fact]
+    public void AsiLoaderManualInstructions_TellUserWhereToPlaceTheZipAndRetry()
+    {
+        string cacheDir = Path.Combine("C:\\", "Users", "example", "AppData", "Local", "Sims3ModernPatcher", "cache");
+
+        string text = AsiLoaderCache.BuildManualInstructions(
+            cacheDir,
+            new[] { "Download failed (404 Not Found): https://example.invalid/wininet-Win32.zip" });
+
+        Assert.Contains("Could not download Ultimate ASI Loader automatically.", text);
+        Assert.Contains("Auto download error: Download failed (404 Not Found)", text);
+        Assert.Contains(AsiLoaderCache.GitHubRepoUrl, text);
+        Assert.Contains(AsiLoaderCache.NamedZipUrl, text);
+        Assert.Contains(AsiLoaderCache.CombinedZipUrl, text);
+        Assert.Contains(AsiLoaderCache.NamedZipFileName, text);
+        Assert.Contains(AsiLoaderCache.CombinedZipFileName, text);
+        Assert.Contains(Path.GetFullPath(cacheDir), text);
+        Assert.Contains(Path.GetFullPath(AsiLoaderCache.GetCanonicalZipPath(cacheDir)), text);
+        Assert.Contains("retry the patching process", text, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("press GO again", text, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void AsiLoaderCache_PersistsManualRequestAndUsesLocalZipFirst()
+    {
+        using var temp = new TemporaryDirectory();
+        string cacheDir = Path.Combine(temp.Path, "cache");
+        Directory.CreateDirectory(cacheDir);
+        var log = new List<string>();
+
+        Assert.False(AsiLoaderCache.TryUseManualLocalArchive(cacheDir, log.Add));
+
+        AsiLoaderCache.MarkManualDownloadRequested(cacheDir);
+        Assert.True(AsiLoaderCache.ManualDownloadWasRequested(cacheDir));
+        Assert.True(File.Exists(AsiLoaderCache.GetMarkerPath(cacheDir)));
+        Assert.False(AsiLoaderCache.TryUseManualLocalArchive(cacheDir, log.Add));
+        Assert.Contains(log, line => line.Contains("Manual ASI Loader download was requested", StringComparison.Ordinal));
+
+        string combined = Path.Combine(cacheDir, AsiLoaderCache.CombinedZipFileName);
+        using (ZipArchive archive = ZipFile.Open(combined, ZipArchiveMode.Create))
+        {
+            ZipArchiveEntry entry = archive.CreateEntry("dinput8.dll");
+            using StreamWriter writer = new(entry.Open());
+            writer.Write("loader");
+        }
+
+        log.Clear();
+        Assert.True(AsiLoaderCache.TryUseManualLocalArchive(cacheDir, log.Add));
+        Assert.False(AsiLoaderCache.ManualDownloadWasRequested(cacheDir));
+        Assert.True(AsiLoaderCache.IsUsableArchive(AsiLoaderCache.GetCanonicalZipPath(cacheDir)));
+        Assert.Contains(log, line => line.Contains("skipping network", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void AsiLoaderCache_FindsNamedWininetZip()
+    {
+        using var temp = new TemporaryDirectory();
+        string named = Path.Combine(temp.Path, AsiLoaderCache.NamedZipFileName);
+        using (ZipArchive archive = ZipFile.Open(named, ZipArchiveMode.Create))
+        {
+            ZipArchiveEntry entry = archive.CreateEntry("wininet.dll");
+            using StreamWriter writer = new(entry.Open());
+            writer.Write("named");
+        }
+
+        Assert.Equal(named, AsiLoaderCache.FindUsableArchive(temp.Path));
+        Assert.False(AsiLoaderCache.TryUseManualLocalArchive(temp.Path, _ => { }));
+    }
+
+    [Fact]
     public void TarGzExtractor_ExtractsOnlyExactArchitectureSuffix()
     {
         using var temp = new TemporaryDirectory();
