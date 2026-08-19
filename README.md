@@ -150,6 +150,13 @@ but must remain explicitly limited to known Sims 3/EA names.
 - **Writes a patcher log**: every progress line is also saved under
   `%LOCALAPPDATA%\Sims3ModernPatcher\Logs\patcher-*.log` (Open Logs button in the UI).
 - **Verifies downloads**: pinned third-party releases are SHA-256 checked before extraction.
+  Ultimate ASI Loader follows GitHub's rolling `Win32-latest` tag (name-based URL, not a
+  disposable asset id) and is checked against that release's SHA-256 digest when GitHub
+  publishes one. If every automatic source fails, the error dialog tells you to download
+  `wininet-Win32.zip` or `Ultimate-ASI-Loader.zip` from
+  [ThirteenAG/Ultimate-ASI-Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader)
+  into `%LOCALAPPDATA%\Sims3ModernPatcher\cache` and retry. That request is remembered in
+  a sidecar marker so the next run uses the local zip before trying the network again.
 - **Avoids partial installs**: all downloads finish before game files change, and a per-run
   rollback snapshot restores touched files if a later local step fails.
 - **Launches through the correct platform**: Steam shortcuts use Steam AppID 47890;

@@ -12,8 +12,9 @@ namespace Sims3ModernPatcher
     public sealed class PatcherEngine
     {
         private static readonly HttpClient Http = CreateHttpClient();
-        private const string AsiLoaderUrl = "https://api.github.com/repos/ThirteenAG/Ultimate-ASI-Loader/releases/assets/436296109";
-        private const string AsiLoaderSha256 = "e5bb99c880faa39181997097fbde3ba553f4ac03bdb8f50421d1c7e4a003a57b";
+        private const string AsiLoaderReleaseApiUrl =
+            "https://api.github.com/repos/ThirteenAG/Ultimate-ASI-Loader/releases/tags/Win32-latest";
+        private static readonly string[] AsiLoaderEntryNames = { "wininet.dll", "dinput8.dll" };
         private const string S3ssUrl = "https://github.com/sims3fiend/Sims3SettingsSetter/releases/download/1.6.3/Sims3SettingsSetter.asi";
         private const string S3ssSha256 = "69ce87ee84528748ee1f19c1f7cb2183e8e8cb7f7cae57cdb64098a7ebcdc13a";
         private const string DxvkUrl = "https://github.com/doitsujin/dxvk/releases/download/v2.6.1/dxvk-2.6.1.tar.gz";
@@ -253,11 +254,7 @@ namespace Sims3ModernPatcher
             Action<string> log)
         {
             log("[*] Preflight: Ultimate ASI Loader...");
-            await DownloadFileAsync(
-                AsiLoaderUrl,
-                Path.Combine(cacheDir, "wininet-Win32.zip"),
-                AsiLoaderSha256,
-                log);
+            await EnsureAsiLoaderDownloadedAsync(cacheDir, log);
 
             log("[*] Preflight: Sims 3 Settings Setter 1.6.3...");
             await DownloadFileAsync(
@@ -465,16 +462,15 @@ namespace Sims3ModernPatcher
             // Sims 3 is 32-bit. Prefer dinput8.dll so DXVK can own d3d9.dll and EA App is less
             // likely to fight a wininet.dll proxy (seen as WININET.dll_unloaded crashes on Win11/EA).
             string targetDll = Path.Combine(binFolder, "dinput8.dll");
-            string zipPath = Path.Combine(cacheDir, "wininet-Win32.zip");
+            string zipPath = AsiLoaderCache.GetCanonicalZipPath(cacheDir);
 
             log("[*] Downloading Ultimate ASI Loader (32-bit)...");
-            await DownloadFileAsync(AsiLoaderUrl, zipPath, AsiLoaderSha256, log);
+            await EnsureAsiLoaderDownloadedAsync(cacheDir, log);
 
             if (File.Exists(targetDll))
                 BackupFile(targetDll, Path.Combine(backupFolder, "dinput8.dll.bak"));
 
-            // Release zip entry is named wininet.dll; rename on extract target path.
-            SafeArchiveExtractor.ExtractZipEntry(zipPath, "wininet.dll", targetDll);
+            SafeArchiveExtractor.ExtractZipEntry(zipPath, AsiLoaderEntryNames, targetDll);
             log("[SUCCESS] Installed ASI Loader as Game\\Bin\\dinput8.dll.");
 
             // Remove a previously installed wininet proxy so it cannot keep crashing launches.
@@ -834,44 +830,274 @@ namespace Sims3ModernPatcher
             }
         }
 
-        private static async Task DownloadFileAsync(
+        private static async Task EnsureAsiLoaderDownloadedAsync(string cacheDir, Action<string> log)
+        {
+            Directory.CreateDirectory(cacheDir);
+            string zipPath = AsiLoaderCache.GetCanonicalZipPath(cacheDir);
+
+            if (AsiLoaderCache.TryUseManualLocalArchive(cacheDir, log))
+                return;
+
+            GitHubReleaseAsset? asset = await TryResolveAsiLoaderAssetAsync(log);
+            var errors = new List<string>();
+
+            if (TryUseCachedAsiLoader(zipPath, asset?.Sha256, refreshIfHashDiffers: true, log))
+            {
+                AsiLoaderCache.ClearManualDownloadRequest(cacheDir);
+                return;
+            }
+
+            var urls = new List<string>();
+            AddUniqueUrl(urls, asset?.BrowserDownloadUrl);
+            AddUniqueUrl(urls, asset?.ApiDownloadUrl);
+            AddUniqueUrl(urls, AsiLoaderCache.NamedZipUrl);
+
+            try
+            {
+                await DownloadFileAsync(urls, zipPath, asset?.Sha256, log);
+                if (!AsiLoaderCache.IsUsableArchive(zipPath))
+                    throw new InvalidDataException($"{AsiLoaderCache.NamedZipFileName} does not contain wininet.dll or dinput8.dll.");
+                AsiLoaderCache.ClearManualDownloadRequest(cacheDir);
+                return;
+            }
+            catch (Exception ex)
+            {
+                errors.Add(DescribeDownloadError(ex));
+                log($"[!] Named {AsiLoaderCache.NamedZipFileName} download failed ({errors[^1]}); trying combined {AsiLoaderCache.CombinedZipFileName}...");
+            }
+
+            if (TryUseCachedAsiLoader(zipPath, asset?.Sha256, refreshIfHashDiffers: false, log))
+            {
+                AsiLoaderCache.ClearManualDownloadRequest(cacheDir);
+                return;
+            }
+
+            try
+            {
+                string combinedPath = Path.Combine(cacheDir, AsiLoaderCache.CombinedZipFileName);
+                await DownloadFileAsync(
+                    new[] { AsiLoaderCache.CombinedZipUrl },
+                    combinedPath,
+                    expectedSha256: null,
+                    log);
+                if (!AsiLoaderCache.IsUsableArchive(combinedPath))
+                    throw new InvalidDataException($"{AsiLoaderCache.CombinedZipFileName} does not contain wininet.dll or dinput8.dll.");
+                AsiLoaderCache.MaterializeCanonicalArchive(cacheDir, combinedPath);
+                AsiLoaderCache.ClearManualDownloadRequest(cacheDir);
+                return;
+            }
+            catch (Exception ex)
+            {
+                errors.Add(DescribeDownloadError(ex));
+                log($"[!] Combined {AsiLoaderCache.CombinedZipFileName} download failed ({errors[^1]}).");
+            }
+
+            string? leftover = AsiLoaderCache.FindUsableArchive(cacheDir);
+            if (leftover is not null)
+            {
+                AsiLoaderCache.MaterializeCanonicalArchive(cacheDir, leftover);
+                log($"[INFO] Using cached ASI Loader archive after download failure: {Path.GetFileName(leftover)}");
+                AsiLoaderCache.ClearManualDownloadRequest(cacheDir);
+                return;
+            }
+
+            AsiLoaderCache.MarkManualDownloadRequested(cacheDir);
+            throw new InvalidOperationException(AsiLoaderCache.BuildManualInstructions(cacheDir, errors));
+        }
+
+        public static string BuildAsiLoaderManualInstructions(
+            string zipPath,
+            IReadOnlyList<string>? errors = null)
+        {
+            string cacheDir = Path.GetDirectoryName(Path.GetFullPath(zipPath)) ?? zipPath;
+            return AsiLoaderCache.BuildManualInstructions(cacheDir, errors);
+        }
+
+        private static async Task<GitHubReleaseAsset?> TryResolveAsiLoaderAssetAsync(Action<string> log)
+        {
+            try
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Get, AsiLoaderReleaseApiUrl);
+                request.Headers.Accept.ParseAdd("application/vnd.github+json");
+                using HttpResponseMessage response = await Http.SendAsync(request);
+                if (!response.IsSuccessStatusCode)
+                {
+                    log($"[!] GitHub release lookup returned {(int)response.StatusCode}; using direct download URLs.");
+                    return null;
+                }
+
+                string json = await response.Content.ReadAsStringAsync();
+                GitHubReleaseAsset? asset = GitHubReleaseAssets.FindByName(json, AsiLoaderCache.NamedZipFileName);
+                if (asset is null)
+                {
+                    log($"[!] GitHub Win32-latest release does not list {AsiLoaderCache.NamedZipFileName}; using direct download URLs.");
+                    return null;
+                }
+
+                log("[+] Resolved Ultimate ASI Loader from GitHub tag Win32-latest.");
+                return asset;
+            }
+            catch (Exception ex)
+            {
+                log($"[!] GitHub release lookup failed ({ex.Message}); using direct download URLs.");
+                return null;
+            }
+        }
+
+        private static bool TryUseCachedAsiLoader(
+            string zipPath,
+            string? expectedSha256,
+            bool refreshIfHashDiffers,
+            Action<string> log)
+        {
+            if (!AsiLoaderCache.IsUsableArchive(zipPath))
+                return false;
+
+            if (string.IsNullOrWhiteSpace(expectedSha256))
+            {
+                log($"[INFO] Using cached ASI Loader archive: {Path.GetFileName(zipPath)}");
+                return true;
+            }
+
+            try
+            {
+                FileIntegrity.VerifySha256(zipPath, expectedSha256);
+                log($"[INFO] Using verified cached download: {Path.GetFileName(zipPath)}");
+                return true;
+            }
+            catch (InvalidDataException)
+            {
+                if (refreshIfHashDiffers)
+                {
+                    log("[INFO] Cached ASI Loader archive is valid but not the current GitHub digest; trying to download an update.");
+                    return false;
+                }
+
+                log($"[INFO] Using cached ASI Loader archive after download failure: {Path.GetFileName(zipPath)}");
+                return true;
+            }
+        }
+
+        private static string DescribeDownloadError(Exception ex)
+        {
+            Exception current = ex;
+            while (current.InnerException is not null)
+                current = current.InnerException;
+            return current.Message;
+        }
+
+        private static void AddUniqueUrl(List<string> urls, string? url)
+        {
+            if (string.IsNullOrWhiteSpace(url))
+                return;
+            if (urls.Any(existing => existing.Equals(url, StringComparison.OrdinalIgnoreCase)))
+                return;
+            urls.Add(url);
+        }
+
+        private static Task DownloadFileAsync(
             string url,
             string destination,
             string expectedSha256,
             Action<string> log)
+            => DownloadFileAsync(new[] { url }, destination, expectedSha256, log);
+
+        private static async Task DownloadFileAsync(
+            IReadOnlyList<string> urls,
+            string destination,
+            string? expectedSha256,
+            Action<string> log)
         {
+            if (urls is null || urls.Count == 0)
+                throw new ArgumentException("At least one download URL is required.", nameof(urls));
+
             if (File.Exists(destination) && new FileInfo(destination).Length > 0)
             {
-                try
+                if (HasUsableCachedDownload(destination, expectedSha256))
                 {
-                    FileIntegrity.VerifySha256(destination, expectedSha256);
                     log($"[INFO] Using verified cached download: {Path.GetFileName(destination)}");
                     return;
                 }
-                catch (InvalidDataException)
+            }
+
+            Exception? lastError = null;
+            for (int index = 0; index < urls.Count; index++)
+            {
+                string url = urls[index];
+                try
                 {
-                    File.Delete(destination);
+                    await DownloadFileOnceAsync(url, destination, expectedSha256, log);
+                    return;
+                }
+                catch (Exception ex) when (ex is HttpRequestException or InvalidDataException or IOException)
+                {
+                    lastError = ex;
+                    if (index < urls.Count - 1)
+                        log($"[!] Download failed ({ex.Message}); trying next source...");
                 }
             }
 
+            throw new HttpRequestException(
+                $"Could not download {Path.GetFileName(destination)}.",
+                lastError);
+        }
+
+        private static bool HasUsableCachedDownload(string destination, string? expectedSha256)
+        {
+            if (string.IsNullOrWhiteSpace(expectedSha256))
+                return false;
+
+            try
+            {
+                FileIntegrity.VerifySha256(destination, expectedSha256);
+                return true;
+            }
+            catch (InvalidDataException)
+            {
+                return false;
+            }
+        }
+
+        private static async Task DownloadFileOnceAsync(
+            string url,
+            string destination,
+            string? expectedSha256,
+            Action<string> log)
+        {
             string temporary = destination + ".download";
             if (File.Exists(temporary))
                 File.Delete(temporary);
 
-            using var request = new HttpRequestMessage(HttpMethod.Get, url);
-            if (request.RequestUri?.Host.Equals("api.github.com", StringComparison.OrdinalIgnoreCase) == true)
-                request.Headers.Accept.ParseAdd("application/octet-stream");
-            using var response = await Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
-            response.EnsureSuccessStatusCode();
-            await using var remote = await response.Content.ReadAsStreamAsync();
-            await using (var local = File.Create(temporary))
+            try
             {
-                await remote.CopyToAsync(local);
-            }
+                using var request = new HttpRequestMessage(HttpMethod.Get, url);
+                if (request.RequestUri?.Host.Equals("api.github.com", StringComparison.OrdinalIgnoreCase) == true)
+                    request.Headers.Accept.ParseAdd("application/octet-stream");
+                using HttpResponseMessage response = await Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new HttpRequestException(
+                        $"Download failed ({(int)response.StatusCode} {response.ReasonPhrase}): {url}");
+                }
 
-            FileIntegrity.VerifySha256(temporary, expectedSha256);
-            File.Move(temporary, destination, overwrite: true);
-            log($"[+] Downloaded {Path.GetFileName(destination)}");
+                await using Stream remote = await response.Content.ReadAsStreamAsync();
+                await using (FileStream local = File.Create(temporary))
+                {
+                    await remote.CopyToAsync(local);
+                }
+
+                if (!string.IsNullOrWhiteSpace(expectedSha256))
+                    FileIntegrity.VerifySha256(temporary, expectedSha256);
+
+                File.Move(temporary, destination, overwrite: true);
+                log($"[+] Downloaded {Path.GetFileName(destination)}");
+            }
+            catch
+            {
+                if (File.Exists(temporary))
+                    File.Delete(temporary);
+                throw;
+            }
         }
 
         private static void BackupFile(string source, string backupPath)

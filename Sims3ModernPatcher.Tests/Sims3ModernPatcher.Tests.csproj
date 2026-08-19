@@ -9,7 +9,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Sims3ModernPatcher.csproj" />
+    <ProjectReference Include="..\Sims3ModernPatcher.csproj">
+      <AdditionalProperties>SkipAppManifest=true</AdditionalProperties>
+    </ProjectReference>
   </ItemGroup>
 
   <ItemGroup>

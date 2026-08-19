@@ -326,14 +326,32 @@ namespace Sims3ModernPatcher
             string expectedFileName,
             string destinationPath)
         {
-            using ZipArchive archive = ZipFile.OpenRead(archivePath);
-            ZipArchiveEntry? entry = archive.Entries.FirstOrDefault(
-                candidate => candidate.Name.Equals(expectedFileName, StringComparison.OrdinalIgnoreCase));
-            if (entry is null)
-                throw new InvalidDataException($"{expectedFileName} was not found in {Path.GetFileName(archivePath)}.");
+            ExtractZipEntry(archivePath, new[] { expectedFileName }, destinationPath);
+        }
 
-            Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
-            entry.ExtractToFile(destinationPath, overwrite: true);
+        public static void ExtractZipEntry(
+            string archivePath,
+            IReadOnlyList<string> candidateFileNames,
+            string destinationPath)
+        {
+            if (candidateFileNames is null || candidateFileNames.Count == 0)
+                throw new ArgumentException("At least one candidate file name is required.", nameof(candidateFileNames));
+
+            using ZipArchive archive = ZipFile.OpenRead(archivePath);
+            foreach (string expectedFileName in candidateFileNames)
+            {
+                ZipArchiveEntry? entry = archive.Entries.FirstOrDefault(
+                    candidate => candidate.Name.Equals(expectedFileName, StringComparison.OrdinalIgnoreCase));
+                if (entry is null)
+                    continue;
+
+                Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
+                entry.ExtractToFile(destinationPath, overwrite: true);
+                return;
+            }
+
+            throw new InvalidDataException(
+                $"{string.Join(" or ", candidateFileNames)} was not found in {Path.GetFileName(archivePath)}.");
         }
 
         public static void ExtractTarGzEntry(

@@ -8,7 +8,7 @@
     <UseWPF>true</UseWPF>
     <AssemblyName>Sims3ModernPatcher</AssemblyName>
     <RootNamespace>Sims3ModernPatcher</RootNamespace>
-    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationManifest Condition="'$(SkipAppManifest)' != 'true'">app.manifest</ApplicationManifest>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(PublishSingleFile)' == 'true'">
