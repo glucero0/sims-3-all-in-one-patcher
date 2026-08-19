@@ -78,9 +78,24 @@
             <Border Grid.Column="0" Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="10" Padding="16" Margin="0,0,8,0">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top" Margin="0,0,0,10">
-                        <TextBlock Text="CHOICES (only when needed)" FontSize="11" FontWeight="Bold" Foreground="#64748B"/>
-                        <TextBlock Text="If two fixes disagree, pick the option that sounds right for you. Plain-language notes are included."
-                                   FontSize="12" Foreground="#94A3B8" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                        <TextBlock Text="CHOICES" FontSize="11" FontWeight="Bold" Foreground="#64748B"/>
+                        <TextBlock Text="Pick the options for this run. Extra prompts appear here only if more than one Sims 3 install is found."
+                                   FontSize="12" Foreground="#94A3B8" TextWrapping="Wrap" Margin="0,4,0,12"/>
+                        <CheckBox x:Name="ChkInstallDxvk"
+                                  Content="Install DXVK (downloads 32-bit d3d9.dll — fixes Serious Errors on many modern GPUs)"
+                                  IsChecked="True"
+                                  Foreground="#CBD5E1"
+                                  FontWeight="SemiBold"/>
+                        <TextBlock Margin="24,4,0,0"
+                                   FontSize="11"
+                                   Foreground="#94A3B8"
+                                   TextWrapping="Wrap"
+                                   Text="DXVK translates the game’s old DirectX 9 calls through Vulkan. Recommended for NVIDIA GPUs (helps avoid Serious Errors on modern drivers). Optional on AMD/Intel — uncheck to use the built-in DirectX path."/>
+                        <CheckBox x:Name="ChkCreateShortcut"
+                                  Content="Create desktop shortcut for easy launching"
+                                  IsChecked="True"
+                                  Foreground="#CBD5E1"
+                                  Margin="0,10,0,0"/>
                     </StackPanel>
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <StackPanel x:Name="ConflictPanel"/>
@@ -107,57 +122,34 @@
 
         <!-- Footer -->
         <Border Grid.Row="3" Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="10" Padding="16" Margin="0,14,0,0">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-                <StackPanel Grid.Row="0" Margin="0,0,0,12">
-                    <CheckBox x:Name="ChkInstallDxvk"
-                              Content="Install DXVK (downloads 32-bit d3d9.dll — fixes Serious Errors on many modern GPUs)"
-                              IsChecked="True"
-                              Foreground="#CBD5E1"
-                              FontWeight="SemiBold"/>
-                    <TextBlock Margin="24,4,0,0"
-                               FontSize="11"
-                               Foreground="#94A3B8"
-                               TextWrapping="Wrap"
-                               Text="DXVK translates the game’s old DirectX 9 calls through Vulkan. Leave this on for RTX 40/50 cards. Uncheck only if you want the built-in DirectX path."/>
-                    <CheckBox x:Name="ChkCreateShortcut"
-                              Content="Create desktop shortcut for easy launching"
-                              IsChecked="True"
-                              Foreground="#CBD5E1"
-                              Margin="0,10,0,0"/>
-                </StackPanel>
-                <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Button x:Name="BtnOpenLogs"
-                            Content="Open Logs"
-                            Height="36"
-                            Padding="14,0"
-                            Background="#334155"
-                            Foreground="White"
-                            BorderThickness="0"
-                            Click="BtnOpenLogs_Click"/>
-                    <Button x:Name="BtnOpenSaveBackups"
-                            Content="Open Save Backups"
-                            Height="36"
-                            Padding="14,0"
-                            Margin="12,0"
-                            Background="#334155"
-                            Foreground="White"
-                            BorderThickness="0"
-                            Click="BtnOpenSaveBackups_Click"/>
-                    <Button x:Name="BtnGo"
-                            Content="GO"
-                            Width="160" Height="44"
-                            Background="#2563EB"
-                            Foreground="White"
-                            FontWeight="Bold"
-                            FontSize="18"
-                            BorderThickness="0"
-                            Click="BtnGo_Click"/>
-                </StackPanel>
-            </Grid>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="BtnOpenLogs"
+                        Content="Open Logs"
+                        Height="36"
+                        Padding="14,0"
+                        Background="#334155"
+                        Foreground="White"
+                        BorderThickness="0"
+                        Click="BtnOpenLogs_Click"/>
+                <Button x:Name="BtnOpenSaveBackups"
+                        Content="Open Save Backups"
+                        Height="36"
+                        Padding="14,0"
+                        Margin="12,0"
+                        Background="#334155"
+                        Foreground="White"
+                        BorderThickness="0"
+                        Click="BtnOpenSaveBackups_Click"/>
+                <Button x:Name="BtnGo"
+                        Content="Patch"
+                        Width="160" Height="44"
+                        Background="#2563EB"
+                        Foreground="White"
+                        FontWeight="Bold"
+                        FontSize="18"
+                        BorderThickness="0"
+                        Click="BtnGo_Click"/>
+            </StackPanel>
         </Border>
 
         <TextBlock Grid.Row="4"
@@ -165,6 +157,6 @@
                    FontSize="11"
                    Foreground="#64748B"
                    TextWrapping="Wrap"
-                   Text="After GO finishes, use the new desktop shortcut (or Steam / EA App). A restart is recommended so Windows fully releases any locked game files."/>
+                   Text="After Patch finishes, use the new desktop shortcut (or Steam / EA App). A restart is recommended so Windows fully releases any locked game files."/>
     </Grid>
 </Window>

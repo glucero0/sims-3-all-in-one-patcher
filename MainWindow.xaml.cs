@@ -81,7 +81,7 @@ namespace Sims3ModernPatcher
             TxtStatus.Text = string.Empty;
             Log($"[+] Using manually selected install ({manual.PlatformLabel}): {manual.Path}");
             Log(ChkInstallDxvk.IsChecked == true
-                ? "[*] DXVK install is checked (will download/install on GO)."
+                ? "[*] DXVK install is checked (will download/install on Patch)."
                 : "[*] DXVK install is unchecked.");
         }
 
@@ -93,7 +93,7 @@ namespace Sims3ModernPatcher
             {
                 MessageBox.Show(
                     this,
-                    "No Sims 3 installation was found.\n\nClick “Browse for Sims 3 folder…” and select the game folder, then press GO.",
+                    "No Sims 3 installation was found.\n\nClick “Browse for Sims 3 folder…” and select the game folder, then press Patch.",
                     "Sims 3 not found",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
@@ -118,6 +118,14 @@ namespace Sims3ModernPatcher
                     "Choose an installation",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
+                return;
+            }
+
+            var consent = new ConsentDialog { Owner = this };
+            if (consent.ShowDialog() != true)
+            {
+                TxtStatus.Text = "Patching cancelled — no changes were made.";
+                Log("[*] User declined consent. No downloads or PC changes were made.");
                 return;
             }
 
@@ -208,7 +216,7 @@ namespace Sims3ModernPatcher
                 Log($"[+] OS: {_hardware.OsName}");
                 Log("[*] Checked Steam libraries, Sims/EA/Origin registry keys, and standard EA App + Steam folders on fixed drives.");
                 Log(ChkInstallDxvk.IsChecked == true
-                    ? "[*] DXVK install is checked (will download/install 32-bit d3d9.dll on GO)."
+                    ? "[*] DXVK install is checked (will download/install 32-bit d3d9.dll on Patch)."
                     : "[*] DXVK install is unchecked (will keep / restore native DirectX 9).");
 
                 if (_installs.Count == 0)
@@ -240,17 +248,29 @@ namespace Sims3ModernPatcher
 
             if (_conflicts.Count == 0)
             {
-                ConflictPanel.Children.Add(new TextBlock
+                if (_installs.Count == 0)
                 {
-                    Text = _installs.Count == 0
-                        ? "No choices yet. Find or browse to a Sims 3 install first."
-                        : "No conflicting choices needed — press GO.",
-                    Foreground = new SolidColorBrush(Color.FromRgb(148, 163, 184)),
-                    TextWrapping = TextWrapping.Wrap,
-                    FontSize = 13
-                });
+                    ConflictPanel.Children.Add(new TextBlock
+                    {
+                        Text = "Find or browse to a Sims 3 install first.",
+                        Foreground = new SolidColorBrush(Color.FromRgb(148, 163, 184)),
+                        TextWrapping = TextWrapping.Wrap,
+                        FontSize = 13,
+                        Margin = new Thickness(0, 12, 0, 0)
+                    });
+                }
+
                 return;
             }
+
+            ConflictPanel.Children.Add(new TextBlock
+            {
+                Text = "More than one Sims 3 install was found — pick which one to patch:",
+                Foreground = new SolidColorBrush(Color.FromRgb(148, 163, 184)),
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = 13,
+                Margin = new Thickness(0, 12, 0, 8)
+            });
 
             foreach (var conflict in _conflicts)
                 ConflictPanel.Children.Add(BuildConflictCard(conflict));

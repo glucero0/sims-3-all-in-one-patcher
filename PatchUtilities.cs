@@ -130,6 +130,61 @@ namespace Sims3ModernPatcher
             changed = !string.Equals(text, updated, StringComparison.Ordinal);
             return updated;
         }
+
+        /// <summary>
+        /// True when the unrecognized-GPU path uses 1024 MB and no longer marks VRAM as invalid.
+        /// </summary>
+        public static bool IsTextureMemoryFallbackApplied(string text)
+        {
+            bool has1024 = Regex.IsMatch(
+                text,
+                @"(?im)^\s*seti\s+textureMemory\s+1024\s*$");
+            bool hasStock32 = Regex.IsMatch(
+                text,
+                @"(?im)^\s*seti\s+textureMemory\s+32\s*$");
+            bool hasUncommentedInvalidFlag = Regex.IsMatch(
+                text,
+                @"(?im)^\s*setb\s+textureMemorySizeOK\s+false\s*$");
+            return has1024 && !hasStock32 && !hasUncommentedInvalidFlag;
+        }
+    }
+
+    public static class DxvkDetector
+    {
+        public static bool LooksLikeDxvk(string d3d9Path)
+        {
+            if (string.IsNullOrWhiteSpace(d3d9Path) || !File.Exists(d3d9Path))
+                return false;
+
+            try
+            {
+                var info = FileVersionInfo.GetVersionInfo(d3d9Path);
+                if (ContainsDxvk(info.CompanyName)
+                    || ContainsDxvk(info.ProductName)
+                    || ContainsDxvk(info.FileDescription))
+                {
+                    return true;
+                }
+            }
+            catch
+            {
+                // Fall through to size heuristic.
+            }
+
+            // System d3d9.dll is typically well under 1 MB; DXVK builds are multi-MB.
+            try
+            {
+                return new FileInfo(d3d9Path).Length >= 1_000_000;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool ContainsDxvk(string? value)
+            => !string.IsNullOrEmpty(value)
+               && value.Contains("DXVK", StringComparison.OrdinalIgnoreCase);
     }
 
     public static class GraphicsCardsEditor
@@ -148,6 +203,76 @@ namespace Sims3ModernPatcher
                 return text;
             }
 
+            string updated = text;
+
+            // Stock Sims 3 lists GTX 580 as "card 1080" (no 0x). DXVK spoofs 0x1080, so normalize.
+            string normalized1080 = Regex.Replace(
+                updated,
+                @"(?im)^(?<indent>\s*)card\s+1080\s+""(?<name>[^""]+)""\s*$",
+                "${indent}card 0x1080 \"${name}\"");
+            if (!string.Equals(normalized1080, updated, StringComparison.Ordinal))
+            {
+                updated = normalized1080;
+                changed = true;
+            }
+
+            // Drop incomplete trailing vendor stubs previously appended without an "end".
+            string withoutStub = Regex.Replace(
+                updated,
+                @"\r?\nvendor\s+""NVIDIA""\s+0x10de\s*\r?\n\s*card\s+0x[0-9a-fA-F]{4}\s+""[^""]+""\s*$",
+                string.Empty,
+                RegexOptions.IgnoreCase);
+            if (!string.Equals(withoutStub, updated, StringComparison.Ordinal))
+            {
+                updated = withoutStub;
+                changed = true;
+            }
+
+            if (!Regex.IsMatch(
+                    updated,
+                    $@"(?im)^\s*card\s+0x{Regex.Escape(deviceId)}\b"))
+            {
+                updated = InsertCardUnderVendor(updated, vendorId, deviceId, cardName, out bool inserted);
+                if (inserted)
+                    changed = true;
+            }
+
+            return updated;
+        }
+
+        /// <summary>
+        /// DXVK's built-in Sims 3 profile spoofs NVIDIA device 0x1080 (GTX 580).
+        /// Ensure that ID exists so the game can resolve graphics hardware under DXVK.
+        /// </summary>
+        public static string EnsureDxvkSpoofCard(string text, out bool changed)
+        {
+            string updated = AddDetectedCard(
+                text,
+                "10de",
+                "1080",
+                "GeForce GTX 580",
+                out bool added);
+            // AddDetectedCard also normalizes bare "card 1080".
+            string withExplicit = InsertCardUnderVendor(
+                updated,
+                "10de",
+                "1080",
+                "GeForce GTX 580",
+                out bool inserted);
+            // InsertCardUnderVendor no-ops if already present.
+            changed = added || inserted
+                      || !string.Equals(text, withExplicit, StringComparison.Ordinal);
+            return withExplicit;
+        }
+
+        private static string InsertCardUnderVendor(
+            string text,
+            string vendorId,
+            string deviceId,
+            string cardName,
+            out bool changed)
+        {
+            changed = false;
             if (Regex.IsMatch(
                     text,
                     $@"(?im)^\s*card\s+0x{Regex.Escape(deviceId)}\b"))
@@ -158,8 +283,17 @@ namespace Sims3ModernPatcher
             string escapedName = cardName.Replace("\"", "'");
             string vendorPattern =
                 $@"(?im)^(?<vendor>\s*vendor\s+""[^""]+""[^\r\n]*\b0x{Regex.Escape(vendorId)}\b[^\r\n]*)$";
-            Match vendor = Regex.Match(text, vendorPattern);
-            if (!vendor.Success)
+            MatchCollection vendors = Regex.Matches(text, vendorPattern);
+            // Prefer the longest vendor line (stock NVIDIA lists several IDs on one line).
+            Match? vendor = vendors
+                .Cast<Match>()
+                .OrderByDescending(m => m.Length)
+                .FirstOrDefault();
+
+            string newline = text.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
+            string cardLine = $"    card 0x{deviceId.ToLowerInvariant()} \"{escapedName}\"";
+
+            if (vendor is null || !vendor.Success)
             {
                 string vendorName = vendorId.ToLowerInvariant() switch
                 {
@@ -168,19 +302,20 @@ namespace Sims3ModernPatcher
                     "8086" => "Intel",
                     _ => "Detected GPU Vendor"
                 };
-                string ending = text.EndsWith("\n", StringComparison.Ordinal) ? string.Empty : "\n";
+                string ending = text.EndsWith("\n", StringComparison.Ordinal) ? string.Empty : newline;
                 changed = true;
                 return text
                     + ending
-                    + $"vendor \"{vendorName}\" 0x{vendorId.ToLowerInvariant()}\n"
-                    + $"    card 0x{deviceId.ToLowerInvariant()} \"{escapedName}\"\n";
+                    + $"vendor \"{vendorName}\" 0x{vendorId.ToLowerInvariant()}"
+                    + newline
+                    + cardLine
+                    + newline
+                    + "end"
+                    + newline;
             }
 
-            string newline = text.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
-            string cardLine = $"    card 0x{deviceId.ToLowerInvariant()} \"{escapedName}\"";
-            string updated = text.Insert(vendor.Index + vendor.Length, newline + cardLine);
             changed = true;
-            return updated;
+            return text.Insert(vendor.Index + vendor.Length, newline + cardLine);
         }
     }
 
