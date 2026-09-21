@@ -14,7 +14,9 @@ permissions:
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
-    runs-on: ubuntu-latest
+    # WPF / net8.0-windows cannot autobuild on Linux. Trace a single
+    # Windows compile of the app project so CodeQL can extract C#.
+    runs-on: windows-latest
     permissions:
       security-events: write
       packages: read
@@ -25,16 +27,32 @@ jobs:
       matrix:
         include:
           - language: csharp
-            build-mode: autobuild
+            build-mode: manual
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+          global-json-file: global.json
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
+
+      - name: Restore
+        run: dotnet restore Sims3ModernPatcher.sln
+
+      # Build the app project once so CodeQL traces a single WPF compile.
+      - name: Build
+        env:
+          DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER: 1
+          MSBUILDDISABLENODEREUSE: 1
+        run: dotnet build Sims3ModernPatcher.csproj -c Release --no-restore -m:1 -p:UseSharedCompilation=false
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4

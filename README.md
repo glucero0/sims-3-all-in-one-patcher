@@ -188,7 +188,11 @@ graphics configuration edits, archive safety, save backups, launcher behavior, a
 ### CI (GitHub Actions)
 
 PRs and pushes to `main` run the same tests on `windows-latest` via `.github/workflows/ci.yml`
-(WPF requires a Windows runner).
+(WPF requires a Windows runner, and `global.json` pins the .NET 8 SDK). Code scanning uses
+`.github/workflows/codeql.yml` on the same Windows runner with a **manual** `dotnet restore` /
+`dotnet build` of `Sims3ModernPatcher.csproj`. Autobuild on Ubuntu cannot compile this
+`net8.0-windows` WPF app. The CodeQL job builds the app project alone so WPF-generated files
+are not rewritten while CodeQL still has them open.
 
 **Enable / verify:**
 
