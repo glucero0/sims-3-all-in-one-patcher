@@ -14,8 +14,8 @@ permissions:
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
-    # WPF / net8.0-windows cannot autobuild on Linux. Trace the same
-    # restore/build as CI so CodeQL sees a real Windows compile.
+    # WPF / net8.0-windows cannot autobuild on Linux. Trace a single
+    # Windows compile of the app project so CodeQL can extract C#.
     runs-on: windows-latest
     permissions:
       security-events: write
@@ -46,8 +46,13 @@ jobs:
       - name: Restore
         run: dotnet restore Sims3ModernPatcher.sln
 
+      # Build the app project once. A solution build also compiles it through
+      # the test ProjectReference (SkipAppManifest=true), and CodeQL's tracer
+      # keeps WPF-generated App.g.cs locked during that second pass.
       - name: Build
-        run: dotnet build Sims3ModernPatcher.sln -c Release --no-restore
+        env:
+          MSBUILDDISABLENODEREUSE: 1
+        run: dotnet build Sims3ModernPatcher.csproj -c Release --no-restore -m:1 -p:UseSharedCompilation=false
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
