@@ -188,7 +188,9 @@ graphics configuration edits, archive safety, save backups, launcher behavior, a
 ### CI (GitHub Actions)
 
 PRs and pushes to `main` run the same tests on `windows-latest` via `.github/workflows/ci.yml`
-(WPF requires a Windows runner).
+(WPF requires a Windows runner). Code scanning uses `.github/workflows/codeql.yml` on the same
+Windows runner with a **manual** `dotnet restore` / `dotnet build` of `Sims3ModernPatcher.sln`.
+Autobuild on Ubuntu cannot compile this `net8.0-windows` WPF app.
 
 **Enable / verify:**
 
