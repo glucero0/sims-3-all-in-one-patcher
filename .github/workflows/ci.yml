@@ -21,12 +21,16 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"
+          global-json-file: global.json
 
       - name: Restore
         run: dotnet restore Sims3ModernPatcher.sln
 
       - name: Build
-        run: dotnet build Sims3ModernPatcher.sln -c Release --no-restore
+        env:
+          DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER: 1
+          MSBUILDDISABLENODEREUSE: 1
+        run: dotnet build Sims3ModernPatcher.sln -c Release --no-restore -p:UseSharedCompilation=false
 
       - name: Test
         run: dotnet test Sims3ModernPatcher.sln -c Release --no-build --verbosity normal

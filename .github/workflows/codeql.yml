@@ -36,6 +36,7 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"
+          global-json-file: global.json
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
@@ -46,11 +47,10 @@ jobs:
       - name: Restore
         run: dotnet restore Sims3ModernPatcher.sln
 
-      # Build the app project once. A solution build also compiles it through
-      # the test ProjectReference (SkipAppManifest=true), and CodeQL's tracer
-      # keeps WPF-generated App.g.cs locked during that second pass.
+      # Build the app project once so CodeQL traces a single WPF compile.
       - name: Build
         env:
+          DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER: 1
           MSBUILDDISABLENODEREUSE: 1
         run: dotnet build Sims3ModernPatcher.csproj -c Release --no-restore -m:1 -p:UseSharedCompilation=false
 
