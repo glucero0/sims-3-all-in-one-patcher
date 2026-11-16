@@ -5,9 +5,7 @@ Native **C# .NET 8 WPF** app for Windows 11. Publishes to a single self-containe
 ## Software Disclaimer
 
 > [!WARNING]
-> This application is alpha software. It is in active development, minimally untested, and may
-> contain defects that damage a Sims 3 installation, mods, settings, or saved games. Use it
-> entirely at your own risk and keep independent backups of anything important.
+> Use this software entirely at your own risk and keep independent backups of anything important.
 
 This software is provided **as is**, without guarantees or warranties of any kind, express or
 implied. There is no guarantee that it will work with any particular computer, Sims 3 release,
